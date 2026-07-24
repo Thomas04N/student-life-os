@@ -2,6 +2,44 @@
 
 A full-stack personal operating system for university students, built as both a practical MSc companion app and a professional software engineering portfolio project.
 
+## Current Status
+
+Under Development
+
+## Planned Features
+
+### Version 1
+
+- User accounts
+- Dashboard
+- Finance tracking
+- Career tracker
+- Responsive UI
+- Deployment
+
+### Future
+
+- University planner
+- Task management
+- Habit tracking
+- AI assistant
+- Document management
+
+## Tech Stack
+
+Frontend:
+- Next.js
+- React
+- TypeScript
+- Tailwind CSS
+
+Backend:
+- PostgreSQL
+- Prisma
+
+Deployment:
+- Vercel
+
 ## Planned MVP
 
 - Authentication with registration, login, logout, and secure sessions
@@ -10,18 +48,6 @@ A full-stack personal operating system for university students, built as both a 
 - Career tracking for job applications, stages, interviews, notes, and statistics
 - Responsive desktop and mobile UI
 - Production deployment, documentation, linting, and testing
-
-## Tech Stack
-
-- Next.js
-- React
-- TypeScript
-- Tailwind CSS
-- shadcn/ui
-- Next.js API routes
-- Prisma
-- PostgreSQL
-- Auth.js / NextAuth
 
 ## Getting Started
 
