@@ -1,3 +1,4 @@
+import Link from "next/link";
 import { redirect } from "next/navigation";
 
 import { logout } from "@/app/auth/actions";
@@ -63,13 +64,16 @@ export default async function Home() {
             </p>
           </div>
 
-          <div className="rounded-lg border border-slate-200 bg-white p-5 shadow-sm">
+          <Link
+            href="/productivity"
+            className="rounded-lg border border-slate-200 bg-white p-5 shadow-sm transition hover:border-teal-300 hover:shadow-md"
+          >
             <p className="text-sm font-medium text-slate-500">Productivity</p>
             <p className="mt-3 text-2xl font-semibold">0 tasks</p>
             <p className="mt-2 text-sm text-slate-600">
-              Your priority tasks and study routines will live here.
+              Open your daily task list and plan focused work.
             </p>
-          </div>
+          </Link>
         </section>
 
         <section className="rounded-lg border border-slate-200 bg-white p-6 shadow-sm">
@@ -97,6 +101,12 @@ export default async function Home() {
                 </div>
               ),
             )}
+            <Link
+              href="/productivity"
+              className="rounded-md border border-teal-200 bg-teal-50 px-4 py-3 text-sm font-medium text-teal-800 transition hover:border-teal-300 hover:bg-teal-100"
+            >
+              Productivity
+            </Link>
           </div>
         </section>
       </div>
