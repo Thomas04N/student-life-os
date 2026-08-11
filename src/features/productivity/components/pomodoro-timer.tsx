@@ -21,6 +21,10 @@ const timerConfig: TimerConfig = {
 };
 
 const STORAGE_KEY = "student-life-os:study-sessions:v1";
+const DAILY_GOAL_STORAGE_KEY = "student-life-os:daily-study-goal:v1";
+const DEFAULT_DAILY_GOAL_SECONDS = 30 * 60;
+const MIN_DAILY_GOAL_SECONDS = 5 * 60;
+const MAX_DAILY_GOAL_SECONDS = 8 * 60 * 60;
 
 const modeLabels: Record<TimerMode, string> = {
   focus: "Focus",
@@ -66,6 +70,13 @@ function formatStudyDuration(totalSeconds: number) {
   }
 
   return `${hours}h ${minutes}m`;
+}
+
+function clampDailyGoal(totalSeconds: number) {
+  return Math.min(
+    MAX_DAILY_GOAL_SECONDS,
+    Math.max(MIN_DAILY_GOAL_SECONDS, totalSeconds),
+  );
 }
 
 function getModeDuration(mode: TimerMode) {
@@ -119,6 +130,20 @@ function createStudySession(): StudySession {
   };
 }
 
+function parseStoredDailyGoal(storedGoal: string | null) {
+  if (!storedGoal) {
+    return DEFAULT_DAILY_GOAL_SECONDS;
+  }
+
+  const parsedGoal = Number(storedGoal);
+
+  if (!Number.isFinite(parsedGoal)) {
+    return DEFAULT_DAILY_GOAL_SECONDS;
+  }
+
+  return clampDailyGoal(parsedGoal);
+}
+
 export function PomodoroTimer() {
   const [mode, setMode] = useState<TimerMode>("focus");
   const [secondsRemaining, setSecondsRemaining] = useState(timerConfig.focus);
@@ -126,6 +151,10 @@ export function PomodoroTimer() {
   const [completedFocusSessions, setCompletedFocusSessions] = useState(0);
   const [studySessions, setStudySessions] = useState<StudySession[]>([]);
   const [hasLoadedStudySessions, setHasLoadedStudySessions] = useState(false);
+  const [dailyGoalSeconds, setDailyGoalSeconds] = useState(
+    DEFAULT_DAILY_GOAL_SECONDS,
+  );
+  const [hasLoadedDailyGoal, setHasLoadedDailyGoal] = useState(false);
 
   const progress = useMemo(() => {
     const duration = getModeDuration(mode);
@@ -164,6 +193,13 @@ export function PomodoroTimer() {
     };
   }, [studySessions]);
 
+  const dailyGoalProgress = Math.min(
+    100,
+    Math.round(
+      (studyStats.todayFocusedSeconds / Math.max(1, dailyGoalSeconds)) * 100,
+    ),
+  );
+
   useEffect(() => {
     void Promise.resolve().then(() => {
       const storedSessions = window.localStorage.getItem(STORAGE_KEY);
@@ -174,10 +210,28 @@ export function PomodoroTimer() {
   }, []);
 
   useEffect(() => {
+    void Promise.resolve().then(() => {
+      const storedGoal = window.localStorage.getItem(DAILY_GOAL_STORAGE_KEY);
+
+      setDailyGoalSeconds(parseStoredDailyGoal(storedGoal));
+      setHasLoadedDailyGoal(true);
+    });
+  }, []);
+
+  useEffect(() => {
     if (hasLoadedStudySessions) {
       window.localStorage.setItem(STORAGE_KEY, JSON.stringify(studySessions));
     }
   }, [hasLoadedStudySessions, studySessions]);
+
+  useEffect(() => {
+    if (hasLoadedDailyGoal) {
+      window.localStorage.setItem(
+        DAILY_GOAL_STORAGE_KEY,
+        String(dailyGoalSeconds),
+      );
+    }
+  }, [dailyGoalSeconds, hasLoadedDailyGoal]);
 
   const completeSession = useCallback(() => {
     setIsRunning(false);
@@ -241,6 +295,12 @@ export function PomodoroTimer() {
     setStudySessions([]);
   }
 
+  function adjustDailyGoal(deltaSeconds: number) {
+    setDailyGoalSeconds((currentGoal) =>
+      clampDailyGoal(currentGoal + deltaSeconds),
+    );
+  }
+
   return (
     <section className="rounded-lg border border-slate-200 bg-white p-6 shadow-sm sm:p-8">
       <div className="mx-auto flex max-w-3xl flex-col items-center gap-5 text-center">
@@ -286,6 +346,57 @@ export function PomodoroTimer() {
               {studyStats.allTimeSessions} focus sessions
             </p>
           </div>
+        </div>
+      </div>
+
+      <div className="mx-auto mt-6 max-w-3xl rounded-lg border border-slate-200 bg-slate-50 p-5">
+        <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
+          <div>
+            <p className="text-sm font-medium text-teal-700">
+              Daily study goal
+            </p>
+            <h3 className="mt-1 text-xl font-semibold tracking-tight text-slate-950">
+              {formatStudyDuration(studyStats.todayFocusedSeconds)} /{" "}
+              {formatStudyDuration(dailyGoalSeconds)}
+            </h3>
+            <p className="mt-1 text-sm text-slate-600">
+              {dailyGoalProgress}% complete today
+            </p>
+          </div>
+
+          <div className="grid grid-cols-4 gap-2 sm:w-auto">
+            {(
+              [
+                [-15 * 60, "-15m"],
+                [-5 * 60, "-5m"],
+                [5 * 60, "+5m"],
+                [15 * 60, "+15m"],
+              ] as const
+            ).map(([deltaSeconds, label]) => (
+              <button
+                key={label}
+                type="button"
+                onClick={() => adjustDailyGoal(deltaSeconds)}
+                className="h-9 rounded-md border border-slate-300 bg-white px-3 text-sm font-medium text-slate-800 transition hover:border-slate-400 hover:bg-slate-50"
+              >
+                {label}
+              </button>
+            ))}
+          </div>
+        </div>
+
+        <div
+          className="mt-4 h-3 overflow-hidden rounded-full bg-slate-200"
+          role="progressbar"
+          aria-label="Daily study goal progress"
+          aria-valuemin={0}
+          aria-valuemax={100}
+          aria-valuenow={dailyGoalProgress}
+        >
+          <div
+            className="h-full rounded-full bg-teal-700 transition-[width] duration-300"
+            style={{ width: `${dailyGoalProgress}%` }}
+          />
         </div>
       </div>
 
