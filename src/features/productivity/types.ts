@@ -16,3 +16,10 @@ export type Task = {
   updatedAt: string;
   completedAt: string | null;
 };
+
+export type StudySession = {
+  id: string;
+  completedAt: string;
+  dateKey: string;
+  focusedSeconds: number;
+};

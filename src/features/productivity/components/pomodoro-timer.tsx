@@ -2,6 +2,8 @@
 
 import { useCallback, useEffect, useMemo, useState } from "react";
 
+import type { StudySession } from "@/features/productivity/types";
+
 type TimerMode = "focus" | "shortBreak" | "longBreak";
 
 type TimerConfig = {
@@ -18,6 +20,8 @@ const timerConfig: TimerConfig = {
   longBreakInterval: 4,
 };
 
+const STORAGE_KEY = "student-life-os:study-sessions:v1";
+
 const modeLabels: Record<TimerMode, string> = {
   focus: "Focus",
   shortBreak: "Short break",
@@ -31,6 +35,15 @@ const timerRing = {
   strokeWidth: 16,
 };
 
+function todayKey() {
+  const now = new Date();
+  const year = now.getFullYear();
+  const month = String(now.getMonth() + 1).padStart(2, "0");
+  const day = String(now.getDate()).padStart(2, "0");
+
+  return `${year}-${month}-${day}`;
+}
+
 function formatTime(totalSeconds: number) {
   const minutes = Math.floor(totalSeconds / 60);
   const seconds = totalSeconds % 60;
@@ -38,6 +51,21 @@ function formatTime(totalSeconds: number) {
   return `${minutes.toString().padStart(2, "0")}:${seconds
     .toString()
     .padStart(2, "0")}`;
+}
+
+function formatStudyDuration(totalSeconds: number) {
+  const hours = Math.floor(totalSeconds / 3600);
+  const minutes = Math.round((totalSeconds % 3600) / 60);
+
+  if (hours === 0) {
+    return `${minutes}m`;
+  }
+
+  if (minutes === 0) {
+    return `${hours}h`;
+  }
+
+  return `${hours}h ${minutes}m`;
 }
 
 function getModeDuration(mode: TimerMode) {
@@ -54,11 +82,50 @@ function getNextMode(currentMode: TimerMode, completedFocusSessions: number) {
     : "shortBreak";
 }
 
+function parseStoredStudySessions(storedSessions: string | null) {
+  if (!storedSessions) {
+    return [];
+  }
+
+  try {
+    const parsedSessions = JSON.parse(storedSessions);
+
+    if (!Array.isArray(parsedSessions)) {
+      return [];
+    }
+
+    return parsedSessions.filter(
+      (session): session is StudySession =>
+        typeof session === "object" &&
+        session !== null &&
+        typeof session.id === "string" &&
+        typeof session.completedAt === "string" &&
+        typeof session.dateKey === "string" &&
+        typeof session.focusedSeconds === "number",
+    );
+  } catch {
+    return [];
+  }
+}
+
+function createStudySession(): StudySession {
+  const completedAt = new Date();
+
+  return {
+    id: crypto.randomUUID(),
+    completedAt: completedAt.toISOString(),
+    dateKey: todayKey(),
+    focusedSeconds: timerConfig.focus,
+  };
+}
+
 export function PomodoroTimer() {
   const [mode, setMode] = useState<TimerMode>("focus");
   const [secondsRemaining, setSecondsRemaining] = useState(timerConfig.focus);
   const [isRunning, setIsRunning] = useState(false);
   const [completedFocusSessions, setCompletedFocusSessions] = useState(0);
+  const [studySessions, setStudySessions] = useState<StudySession[]>([]);
+  const [hasLoadedStudySessions, setHasLoadedStudySessions] = useState(false);
 
   const progress = useMemo(() => {
     const duration = getModeDuration(mode);
@@ -75,10 +142,52 @@ export function PomodoroTimer() {
   const ringOffset =
     timerRing.circumference * (1 - Math.max(0, Math.min(1, remainingProgress)));
 
+  const studyStats = useMemo(() => {
+    const today = todayKey();
+    const todaysSessions = studySessions.filter(
+      (session) => session.dateKey === today,
+    );
+    const totalFocusedSeconds = studySessions.reduce(
+      (total, session) => total + session.focusedSeconds,
+      0,
+    );
+    const todayFocusedSeconds = todaysSessions.reduce(
+      (total, session) => total + session.focusedSeconds,
+      0,
+    );
+
+    return {
+      allTimeSessions: studySessions.length,
+      todayFocusedSeconds,
+      todaySessions: todaysSessions.length,
+      totalFocusedSeconds,
+    };
+  }, [studySessions]);
+
+  useEffect(() => {
+    void Promise.resolve().then(() => {
+      const storedSessions = window.localStorage.getItem(STORAGE_KEY);
+
+      setStudySessions(parseStoredStudySessions(storedSessions));
+      setHasLoadedStudySessions(true);
+    });
+  }, []);
+
+  useEffect(() => {
+    if (hasLoadedStudySessions) {
+      window.localStorage.setItem(STORAGE_KEY, JSON.stringify(studySessions));
+    }
+  }, [hasLoadedStudySessions, studySessions]);
+
   const completeSession = useCallback(() => {
     setIsRunning(false);
 
     if (mode === "focus") {
+      setStudySessions((currentSessions) => [
+        ...currentSessions,
+        createStudySession(),
+      ]);
+
       setCompletedFocusSessions((currentSessions) => {
         const nextSessions = currentSessions + 1;
         const nextMode = getNextMode(mode, nextSessions);
@@ -129,6 +238,7 @@ export function PomodoroTimer() {
 
   function clearSessions() {
     setCompletedFocusSessions(0);
+    setStudySessions([]);
   }
 
   return (
@@ -145,11 +255,37 @@ export function PomodoroTimer() {
           </p>
         </div>
 
-        <div className="rounded-lg border border-slate-200 bg-slate-50 px-6 py-4 text-center">
-          <p className="text-sm font-medium text-slate-500">Completed focus</p>
-          <p className="mt-1 text-3xl font-semibold text-slate-950">
-            {completedFocusSessions}
-          </p>
+        <div className="grid w-full gap-3 sm:grid-cols-2 lg:grid-cols-4">
+          <div className="rounded-lg border border-slate-200 bg-slate-50 px-4 py-4 text-center">
+            <p className="text-sm font-medium text-slate-500">Today studied</p>
+            <p className="mt-1 text-2xl font-semibold text-slate-950">
+              {formatStudyDuration(studyStats.todayFocusedSeconds)}
+            </p>
+          </div>
+
+          <div className="rounded-lg border border-slate-200 bg-slate-50 px-4 py-4 text-center">
+            <p className="text-sm font-medium text-slate-500">Today sessions</p>
+            <p className="mt-1 text-2xl font-semibold text-slate-950">
+              {studyStats.todaySessions}
+            </p>
+          </div>
+
+          <div className="rounded-lg border border-slate-200 bg-slate-50 px-4 py-4 text-center">
+            <p className="text-sm font-medium text-slate-500">Timer cycle</p>
+            <p className="mt-1 text-2xl font-semibold text-slate-950">
+              {completedFocusSessions}
+            </p>
+          </div>
+
+          <div className="rounded-lg border border-slate-200 bg-slate-50 px-4 py-4 text-center">
+            <p className="text-sm font-medium text-slate-500">Total studied</p>
+            <p className="mt-1 text-2xl font-semibold text-slate-950">
+              {formatStudyDuration(studyStats.totalFocusedSeconds)}
+            </p>
+            <p className="mt-1 text-xs text-slate-500">
+              {studyStats.allTimeSessions} focus sessions
+            </p>
+          </div>
         </div>
       </div>
 
