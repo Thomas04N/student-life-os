@@ -3,6 +3,7 @@ import { redirect } from "next/navigation";
 
 import { logout } from "@/app/auth/actions";
 import { ToDoList } from "@/features/productivity/components/to-do-list";
+import { WeeklyStudyChart } from "@/features/productivity/components/weekly-study-chart";
 import { hasSupabaseConfig } from "@/lib/supabase/config";
 import { createClient } from "@/lib/supabase/server";
 
@@ -72,7 +73,9 @@ export default async function ProductivityPage() {
         <section className="rounded-lg border border-teal-200 bg-teal-50 p-5 shadow-sm">
           <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
             <div>
-              <p className="text-sm font-medium text-teal-800">Focus sessions</p>
+              <p className="text-sm font-medium text-teal-800">
+                Focus sessions
+              </p>
               <h2 className="mt-1 text-xl font-semibold tracking-tight text-slate-950">
                 Use the dedicated Pomodoro page when you are ready to study.
               </h2>
@@ -89,6 +92,8 @@ export default async function ProductivityPage() {
             </Link>
           </div>
         </section>
+
+        <WeeklyStudyChart />
 
         <ToDoList />
       </div>
