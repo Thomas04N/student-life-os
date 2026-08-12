@@ -2,6 +2,7 @@ import Link from "next/link";
 import { redirect } from "next/navigation";
 
 import { logout } from "@/app/auth/actions";
+import { StudyStreaks } from "@/features/productivity/components/study-streaks";
 import { WeeklyStudyChart } from "@/features/productivity/components/weekly-study-chart";
 import { hasSupabaseConfig } from "@/lib/supabase/config";
 import { createClient } from "@/lib/supabase/server";
@@ -24,7 +25,7 @@ export default async function StudyPage() {
 
   return (
     <main className="min-h-screen bg-[#f7f7f2] text-slate-950">
-      <div className="mx-auto flex min-h-screen w-full max-w-5xl flex-col gap-8 px-6 py-8">
+      <div className="mx-auto flex min-h-screen w-full max-w-6xl flex-col gap-8 px-6 py-8">
         <header className="flex flex-col gap-4 border-b border-slate-200 pb-6 lg:flex-row lg:items-center lg:justify-between">
           <div>
             <Link
@@ -67,7 +68,10 @@ export default async function StudyPage() {
           </div>
         </header>
 
-        <WeeklyStudyChart />
+        <div className="space-y-6">
+          <StudyStreaks />
+          <WeeklyStudyChart />
+        </div>
       </div>
     </main>
   );
