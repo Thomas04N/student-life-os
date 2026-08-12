@@ -2,13 +2,13 @@ import Link from "next/link";
 import { redirect } from "next/navigation";
 
 import { logout } from "@/app/auth/actions";
-import { ToDoList } from "@/features/productivity/components/to-do-list";
+import { WeeklyStudyChart } from "@/features/productivity/components/weekly-study-chart";
 import { hasSupabaseConfig } from "@/lib/supabase/config";
 import { createClient } from "@/lib/supabase/server";
 
 export const dynamic = "force-dynamic";
 
-export default async function ProductivityPage() {
+export default async function StudyPage() {
   if (!hasSupabaseConfig()) {
     redirect("/auth/login");
   }
@@ -24,7 +24,7 @@ export default async function ProductivityPage() {
 
   return (
     <main className="min-h-screen bg-[#f7f7f2] text-slate-950">
-      <div className="mx-auto flex w-full max-w-7xl flex-col gap-8 px-6 py-8">
+      <div className="mx-auto flex min-h-screen w-full max-w-5xl flex-col gap-8 px-6 py-8">
         <header className="flex flex-col gap-4 border-b border-slate-200 pb-6 lg:flex-row lg:items-center lg:justify-between">
           <div>
             <Link
@@ -34,21 +34,19 @@ export default async function ProductivityPage() {
               Student Life OS
             </Link>
             <h1 className="mt-2 text-3xl font-semibold tracking-tight">
-              Productivity
+              Study analytics
             </h1>
             <p className="mt-2 max-w-2xl text-sm leading-6 text-slate-600">
-              Plan daily tasks, deadlines, and priorities in one focused view.
-              Tasks are stored locally for now and can be connected to Supabase
-              once the schema is ready.
+              Review weekly focused study time from completed Pomodoro sessions.
             </p>
           </div>
 
           <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
             <Link
-              href="/"
+              href="/productivity"
               className="inline-flex h-10 items-center justify-center rounded-md border border-slate-300 bg-white px-4 text-sm font-medium text-slate-800 transition hover:border-slate-400 hover:bg-slate-50"
             >
-              Home
+              Tasks
             </Link>
 
             <Link
@@ -56,13 +54,6 @@ export default async function ProductivityPage() {
               className="inline-flex h-10 items-center justify-center rounded-md border border-slate-300 bg-white px-4 text-sm font-medium text-slate-800 transition hover:border-slate-400 hover:bg-slate-50"
             >
               Pomodoro
-            </Link>
-
-            <Link
-              href="/productivity/study"
-              className="inline-flex h-10 items-center justify-center rounded-md border border-slate-300 bg-white px-4 text-sm font-medium text-slate-800 transition hover:border-slate-400 hover:bg-slate-50"
-            >
-              Study Stats
             </Link>
 
             <form action={logout}>
@@ -76,7 +67,7 @@ export default async function ProductivityPage() {
           </div>
         </header>
 
-        <ToDoList />
+        <WeeklyStudyChart />
       </div>
     </main>
   );
