@@ -31,6 +31,12 @@ const modeLabels: Record<TimerMode, string> = {
   shortBreak: "Short break",
   longBreak: "Long break",
 };
+const SESSION_COMPLETED_FORMATTER = new Intl.DateTimeFormat("en", {
+  day: "numeric",
+  hour: "numeric",
+  minute: "2-digit",
+  month: "short",
+});
 
 const timerRing = {
   circumference: 2 * Math.PI * 142,
@@ -70,6 +76,10 @@ function formatStudyDuration(totalSeconds: number) {
   }
 
   return `${hours}h ${minutes}m`;
+}
+
+function formatSessionCompletedAt(completedAt: string) {
+  return SESSION_COMPLETED_FORMATTER.format(new Date(completedAt));
 }
 
 function clampDailyGoal(totalSeconds: number) {
@@ -112,7 +122,8 @@ function parseStoredStudySessions(storedSessions: string | null) {
         typeof session.id === "string" &&
         typeof session.completedAt === "string" &&
         typeof session.dateKey === "string" &&
-        typeof session.focusedSeconds === "number",
+        typeof session.focusedSeconds === "number" &&
+        (session.notes === undefined || typeof session.notes === "string"),
     );
   } catch {
     return [];
@@ -127,6 +138,7 @@ function createStudySession(): StudySession {
     completedAt: completedAt.toISOString(),
     dateKey: todayKey(),
     focusedSeconds: timerConfig.focus,
+    notes: "",
   };
 }
 
@@ -199,6 +211,13 @@ export function PomodoroTimer() {
       (studyStats.todayFocusedSeconds / Math.max(1, dailyGoalSeconds)) * 100,
     ),
   );
+
+  const latestStudySession = studySessions.at(-1);
+  const recentSessionNotes = studySessions
+    .filter((session) => session.notes?.trim())
+    .slice()
+    .reverse()
+    .slice(0, 4);
 
   useEffect(() => {
     void Promise.resolve().then(() => {
@@ -293,6 +312,14 @@ export function PomodoroTimer() {
   function clearSessions() {
     setCompletedFocusSessions(0);
     setStudySessions([]);
+  }
+
+  function updateSessionNotes(sessionId: string, notes: string) {
+    setStudySessions((currentSessions) =>
+      currentSessions.map((session) =>
+        session.id === sessionId ? { ...session, notes } : session,
+      ),
+    );
   }
 
   function adjustDailyGoal(deltaSeconds: number) {
@@ -454,6 +481,69 @@ export function PomodoroTimer() {
           <p className="mt-4 text-sm text-slate-600">
             {isRunning ? "Timer running" : "Timer paused"}
           </p>
+        </div>
+
+        <div className="w-full rounded-lg border border-slate-200 bg-white p-5 text-left">
+          <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
+            <div>
+              <p className="text-sm font-medium text-teal-700">
+                Focus session notes
+              </p>
+              <h3 className="mt-1 text-lg font-semibold tracking-tight text-slate-950">
+                {latestStudySession
+                  ? "Add a quick note to your latest session"
+                  : "Complete a focus session to add notes"}
+              </h3>
+            </div>
+
+            {latestStudySession ? (
+              <p className="text-sm text-slate-500">
+                {formatSessionCompletedAt(latestStudySession.completedAt)}
+              </p>
+            ) : null}
+          </div>
+
+          {latestStudySession ? (
+            <label className="mt-4 block">
+              <span className="sr-only">Latest focus session notes</span>
+              <textarea
+                value={latestStudySession.notes ?? ""}
+                onChange={(event) =>
+                  updateSessionNotes(latestStudySession.id, event.target.value)
+                }
+                placeholder="Jot down what you covered, what felt hard, or what to pick up next."
+                className="min-h-28 w-full resize-y rounded-md border border-slate-300 bg-slate-50 px-3 py-3 text-sm leading-6 text-slate-950 outline-none transition placeholder:text-slate-400 focus:border-teal-700 focus:bg-white focus:ring-2 focus:ring-teal-700/20"
+              />
+            </label>
+          ) : (
+            <p className="mt-4 rounded-md bg-slate-50 px-4 py-3 text-sm text-slate-600">
+              Your next completed focus block will appear here with space for a
+              short reflection.
+            </p>
+          )}
+
+          {recentSessionNotes.length > 0 ? (
+            <div className="mt-5 border-t border-slate-200 pt-4">
+              <p className="text-sm font-medium text-slate-700">
+                Recent notes
+              </p>
+              <div className="mt-3 space-y-3">
+                {recentSessionNotes.map((session) => (
+                  <article
+                    key={session.id}
+                    className="rounded-md border border-slate-200 bg-slate-50 px-3 py-3"
+                  >
+                    <p className="text-xs font-medium text-slate-500">
+                      {formatSessionCompletedAt(session.completedAt)}
+                    </p>
+                    <p className="mt-2 whitespace-pre-wrap text-sm leading-6 text-slate-800">
+                      {session.notes}
+                    </p>
+                  </article>
+                ))}
+              </div>
+            </div>
+          ) : null}
         </div>
 
         <div className="flex w-full flex-col gap-5">

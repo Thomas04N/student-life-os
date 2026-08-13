@@ -22,4 +22,5 @@ export type StudySession = {
   completedAt: string;
   dateKey: string;
   focusedSeconds: number;
+  notes?: string;
 };
