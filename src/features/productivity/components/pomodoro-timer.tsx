@@ -123,7 +123,9 @@ function parseStoredStudySessions(storedSessions: string | null) {
         typeof session.completedAt === "string" &&
         typeof session.dateKey === "string" &&
         typeof session.focusedSeconds === "number" &&
-        (session.notes === undefined || typeof session.notes === "string"),
+        (session.notes === undefined || typeof session.notes === "string") &&
+        (session.studiedTopic === undefined ||
+          typeof session.studiedTopic === "string"),
     );
   } catch {
     return [];
@@ -139,6 +141,7 @@ function createStudySession(): StudySession {
     dateKey: todayKey(),
     focusedSeconds: timerConfig.focus,
     notes: "",
+    studiedTopic: "",
   };
 }
 
@@ -160,6 +163,7 @@ export function PomodoroTimer() {
   const [mode, setMode] = useState<TimerMode>("focus");
   const [secondsRemaining, setSecondsRemaining] = useState(timerConfig.focus);
   const [isRunning, setIsRunning] = useState(false);
+  const [timerEndsAt, setTimerEndsAt] = useState<number | null>(null);
   const [completedFocusSessions, setCompletedFocusSessions] = useState(0);
   const [studySessions, setStudySessions] = useState<StudySession[]>([]);
   const [hasLoadedStudySessions, setHasLoadedStudySessions] = useState(false);
@@ -214,7 +218,9 @@ export function PomodoroTimer() {
 
   const latestStudySession = studySessions.at(-1);
   const recentSessionNotes = studySessions
-    .filter((session) => session.notes?.trim())
+    .filter(
+      (session) => session.notes?.trim() || session.studiedTopic?.trim(),
+    )
     .slice()
     .reverse()
     .slice(0, 4);
@@ -254,6 +260,7 @@ export function PomodoroTimer() {
 
   const completeSession = useCallback(() => {
     setIsRunning(false);
+    setTimerEndsAt(null);
 
     if (mode === "focus") {
       setStudySessions((currentSessions) => [
@@ -279,33 +286,66 @@ export function PomodoroTimer() {
   }, [mode]);
 
   useEffect(() => {
-    if (!isRunning) {
+    if (!isRunning || timerEndsAt === null) {
       return;
     }
 
+    const currentTimerEndsAt = timerEndsAt;
+    let hasCompleted = false;
+
+    function syncRemainingTime() {
+      const nextSecondsRemaining = Math.max(
+        0,
+        Math.ceil((currentTimerEndsAt - Date.now()) / 1000),
+      );
+
+      setSecondsRemaining(nextSecondsRemaining);
+
+      if (nextSecondsRemaining === 0 && !hasCompleted) {
+        hasCompleted = true;
+        completeSession();
+      }
+    }
+
+    syncRemainingTime();
+
     const intervalId = window.setInterval(() => {
-      setSecondsRemaining((currentSeconds) => {
-        if (currentSeconds > 1) {
-          return currentSeconds - 1;
-        }
-
-        window.setTimeout(completeSession, 0);
-
-        return 0;
-      });
-    }, 1000);
+      syncRemainingTime();
+    }, 250);
 
     return () => window.clearInterval(intervalId);
-  }, [completeSession, isRunning]);
+  }, [completeSession, isRunning, timerEndsAt]);
+
+  function startTimer() {
+    const nextSecondsRemaining =
+      secondsRemaining > 0 ? secondsRemaining : getModeDuration(mode);
+
+    setSecondsRemaining(nextSecondsRemaining);
+    setTimerEndsAt(Date.now() + nextSecondsRemaining * 1000);
+    setIsRunning(true);
+  }
+
+  function pauseTimer() {
+    if (timerEndsAt !== null) {
+      setSecondsRemaining(
+        Math.max(0, Math.ceil((timerEndsAt - Date.now()) / 1000)),
+      );
+    }
+
+    setTimerEndsAt(null);
+    setIsRunning(false);
+  }
 
   function changeMode(nextMode: TimerMode) {
     setMode(nextMode);
     setSecondsRemaining(getModeDuration(nextMode));
+    setTimerEndsAt(null);
     setIsRunning(false);
   }
 
   function resetTimer() {
     setSecondsRemaining(getModeDuration(mode));
+    setTimerEndsAt(null);
     setIsRunning(false);
   }
 
@@ -314,10 +354,10 @@ export function PomodoroTimer() {
     setStudySessions([]);
   }
 
-  function updateSessionNotes(sessionId: string, notes: string) {
+  function updateSession(sessionId: string, updates: Partial<StudySession>) {
     setStudySessions((currentSessions) =>
       currentSessions.map((session) =>
-        session.id === sessionId ? { ...session, notes } : session,
+        session.id === sessionId ? { ...session, ...updates } : session,
       ),
     );
   }
@@ -504,21 +544,44 @@ export function PomodoroTimer() {
           </div>
 
           {latestStudySession ? (
-            <label className="mt-4 block">
-              <span className="sr-only">Latest focus session notes</span>
-              <textarea
-                value={latestStudySession.notes ?? ""}
-                onChange={(event) =>
-                  updateSessionNotes(latestStudySession.id, event.target.value)
-                }
-                placeholder="Jot down what you covered, what felt hard, or what to pick up next."
-                className="min-h-28 w-full resize-y rounded-md border border-slate-300 bg-slate-50 px-3 py-3 text-sm leading-6 text-slate-950 outline-none transition placeholder:text-slate-400 focus:border-teal-700 focus:bg-white focus:ring-2 focus:ring-teal-700/20"
-              />
-            </label>
+            <div className="mt-4 space-y-3">
+              <label className="block">
+                <span className="text-sm font-medium text-slate-700">
+                  What did I study?
+                </span>
+                <input
+                  type="text"
+                  value={latestStudySession.studiedTopic ?? ""}
+                  onChange={(event) =>
+                    updateSession(latestStudySession.id, {
+                      studiedTopic: event.target.value,
+                    })
+                  }
+                  placeholder="Example: Biology revision"
+                  className="mt-2 h-11 w-full rounded-md border border-slate-300 bg-slate-50 px-3 text-sm text-slate-950 outline-none transition placeholder:text-slate-400 focus:border-teal-700 focus:bg-white focus:ring-2 focus:ring-teal-700/20"
+                />
+              </label>
+
+              <label className="block">
+                <span className="text-sm font-medium text-slate-700">
+                  Quick note
+                </span>
+                <textarea
+                  value={latestStudySession.notes ?? ""}
+                  onChange={(event) =>
+                    updateSession(latestStudySession.id, {
+                      notes: event.target.value,
+                    })
+                  }
+                  placeholder="Jot down what you covered, what felt hard, or what to pick up next."
+                  className="mt-2 min-h-28 w-full resize-y rounded-md border border-slate-300 bg-slate-50 px-3 py-3 text-sm leading-6 text-slate-950 outline-none transition placeholder:text-slate-400 focus:border-teal-700 focus:bg-white focus:ring-2 focus:ring-teal-700/20"
+                />
+              </label>
+            </div>
           ) : (
             <p className="mt-4 rounded-md bg-slate-50 px-4 py-3 text-sm text-slate-600">
               Your next completed focus block will appear here with space for a
-              short reflection.
+              study topic and short reflection.
             </p>
           )}
 
@@ -536,9 +599,16 @@ export function PomodoroTimer() {
                     <p className="text-xs font-medium text-slate-500">
                       {formatSessionCompletedAt(session.completedAt)}
                     </p>
-                    <p className="mt-2 whitespace-pre-wrap text-sm leading-6 text-slate-800">
-                      {session.notes}
-                    </p>
+                    {session.studiedTopic?.trim() ? (
+                      <p className="mt-2 text-sm font-semibold text-slate-950">
+                        {session.studiedTopic}
+                      </p>
+                    ) : null}
+                    {session.notes?.trim() ? (
+                      <p className="mt-1 whitespace-pre-wrap text-sm leading-6 text-slate-800">
+                        {session.notes}
+                      </p>
+                    ) : null}
                   </article>
                 ))}
               </div>
@@ -573,7 +643,7 @@ export function PomodoroTimer() {
           <div className="grid gap-2 sm:grid-cols-4">
             <button
               type="button"
-              onClick={() => setIsRunning(true)}
+              onClick={startTimer}
               disabled={isRunning}
               className="h-11 rounded-md bg-teal-700 px-4 text-sm font-semibold text-white transition hover:bg-teal-800 disabled:cursor-not-allowed disabled:bg-slate-300"
             >
@@ -581,7 +651,7 @@ export function PomodoroTimer() {
             </button>
             <button
               type="button"
-              onClick={() => setIsRunning(false)}
+              onClick={pauseTimer}
               disabled={!isRunning}
               className="h-11 rounded-md border border-slate-300 bg-white px-4 text-sm font-medium text-slate-800 transition hover:bg-slate-50 disabled:cursor-not-allowed disabled:text-slate-400"
             >

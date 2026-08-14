@@ -23,4 +23,5 @@ export type StudySession = {
   dateKey: string;
   focusedSeconds: number;
   notes?: string;
+  studiedTopic?: string;
 };
