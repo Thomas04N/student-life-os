@@ -13,6 +13,12 @@ type TimerConfig = {
   longBreakInterval: number;
 };
 
+type SessionDraft = {
+  notes: string;
+  sessionId: string;
+  studiedTopic: string;
+};
+
 const timerConfig: TimerConfig = {
   focus: 25 * 60,
   shortBreak: 5 * 60,
@@ -25,6 +31,11 @@ const DAILY_GOAL_STORAGE_KEY = "student-life-os:daily-study-goal:v1";
 const DEFAULT_DAILY_GOAL_SECONDS = 30 * 60;
 const MIN_DAILY_GOAL_SECONDS = 5 * 60;
 const MAX_DAILY_GOAL_SECONDS = 8 * 60 * 60;
+const EMPTY_SESSION_DRAFT: SessionDraft = {
+  notes: "",
+  sessionId: "",
+  studiedTopic: "",
+};
 
 const modeLabels: Record<TimerMode, string> = {
   focus: "Focus",
@@ -167,6 +178,8 @@ export function PomodoroTimer() {
   const [completedFocusSessions, setCompletedFocusSessions] = useState(0);
   const [studySessions, setStudySessions] = useState<StudySession[]>([]);
   const [hasLoadedStudySessions, setHasLoadedStudySessions] = useState(false);
+  const [sessionDraft, setSessionDraft] =
+    useState<SessionDraft>(EMPTY_SESSION_DRAFT);
   const [dailyGoalSeconds, setDailyGoalSeconds] = useState(
     DEFAULT_DAILY_GOAL_SECONDS,
   );
@@ -224,6 +237,19 @@ export function PomodoroTimer() {
     .slice()
     .reverse()
     .slice(0, 4);
+  const latestSessionDraft =
+    latestStudySession && sessionDraft.sessionId === latestStudySession.id
+      ? sessionDraft
+      : {
+          notes: latestStudySession?.notes ?? "",
+          sessionId: latestStudySession?.id ?? "",
+          studiedTopic: latestStudySession?.studiedTopic ?? "",
+        };
+  const hasUnsavedSessionDraft = latestStudySession
+    ? latestSessionDraft.notes !== (latestStudySession.notes ?? "") ||
+      latestSessionDraft.studiedTopic !==
+        (latestStudySession.studiedTopic ?? "")
+    : false;
 
   useEffect(() => {
     void Promise.resolve().then(() => {
@@ -360,6 +386,48 @@ export function PomodoroTimer() {
         session.id === sessionId ? { ...session, ...updates } : session,
       ),
     );
+  }
+
+  function updateLatestSessionDraft(updates: Partial<SessionDraft>) {
+    if (!latestStudySession) {
+      return;
+    }
+
+    setSessionDraft((currentDraft) => ({
+      notes:
+        currentDraft.sessionId === latestStudySession.id
+          ? currentDraft.notes
+          : (latestStudySession.notes ?? ""),
+      sessionId: latestStudySession.id,
+      studiedTopic:
+        currentDraft.sessionId === latestStudySession.id
+          ? currentDraft.studiedTopic
+          : (latestStudySession.studiedTopic ?? ""),
+      ...updates,
+    }));
+  }
+
+  function saveSessionDraft() {
+    if (!latestStudySession) {
+      return;
+    }
+
+    updateSession(latestStudySession.id, {
+      notes: latestSessionDraft.notes,
+      studiedTopic: latestSessionDraft.studiedTopic,
+    });
+  }
+
+  function discardSessionDraft() {
+    if (!latestStudySession) {
+      return;
+    }
+
+    setSessionDraft({
+      notes: latestStudySession.notes ?? "",
+      sessionId: latestStudySession.id,
+      studiedTopic: latestStudySession.studiedTopic ?? "",
+    });
   }
 
   function adjustDailyGoal(deltaSeconds: number) {
@@ -531,7 +599,7 @@ export function PomodoroTimer() {
               </p>
               <h3 className="mt-1 text-lg font-semibold tracking-tight text-slate-950">
                 {latestStudySession
-                  ? "Add a quick note to your latest session"
+                  ? "Save notes to your latest session"
                   : "Complete a focus session to add notes"}
               </h3>
             </div>
@@ -551,9 +619,9 @@ export function PomodoroTimer() {
                 </span>
                 <input
                   type="text"
-                  value={latestStudySession.studiedTopic ?? ""}
+                  value={latestSessionDraft.studiedTopic}
                   onChange={(event) =>
-                    updateSession(latestStudySession.id, {
+                    updateLatestSessionDraft({
                       studiedTopic: event.target.value,
                     })
                   }
@@ -567,9 +635,9 @@ export function PomodoroTimer() {
                   Quick note
                 </span>
                 <textarea
-                  value={latestStudySession.notes ?? ""}
+                  value={latestSessionDraft.notes}
                   onChange={(event) =>
-                    updateSession(latestStudySession.id, {
+                    updateLatestSessionDraft({
                       notes: event.target.value,
                     })
                   }
@@ -577,6 +645,31 @@ export function PomodoroTimer() {
                   className="mt-2 min-h-28 w-full resize-y rounded-md border border-slate-300 bg-slate-50 px-3 py-3 text-sm leading-6 text-slate-950 outline-none transition placeholder:text-slate-400 focus:border-teal-700 focus:bg-white focus:ring-2 focus:ring-teal-700/20"
                 />
               </label>
+
+              <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+                <p className="text-sm text-slate-500">
+                  Notes are saved only when you press Save.
+                </p>
+
+                <div className="grid gap-2 sm:grid-cols-2">
+                  <button
+                    type="button"
+                    onClick={discardSessionDraft}
+                    disabled={!hasUnsavedSessionDraft}
+                    className="h-10 rounded-md border border-slate-300 bg-white px-4 text-sm font-medium text-slate-800 transition hover:bg-slate-50 disabled:cursor-not-allowed disabled:text-slate-400"
+                  >
+                    Discard
+                  </button>
+                  <button
+                    type="button"
+                    onClick={saveSessionDraft}
+                    disabled={!hasUnsavedSessionDraft}
+                    className="h-10 rounded-md bg-teal-700 px-4 text-sm font-semibold text-white transition hover:bg-teal-800 disabled:cursor-not-allowed disabled:bg-slate-300"
+                  >
+                    Save
+                  </button>
+                </div>
+              </div>
             </div>
           ) : (
             <p className="mt-4 rounded-md bg-slate-50 px-4 py-3 text-sm text-slate-600">
