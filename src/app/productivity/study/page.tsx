@@ -2,6 +2,7 @@ import Link from "next/link";
 import { redirect } from "next/navigation";
 
 import { logout } from "@/app/auth/actions";
+import { SimpleStudyAnalytics } from "@/features/productivity/components/simple-study-analytics";
 import { StudyStreaks } from "@/features/productivity/components/study-streaks";
 import { WeeklyStudyChart } from "@/features/productivity/components/weekly-study-chart";
 import { hasSupabaseConfig } from "@/lib/supabase/config";
@@ -69,8 +70,9 @@ export default async function StudyPage() {
         </header>
 
         <div className="space-y-6">
-          <StudyStreaks />
+          <SimpleStudyAnalytics />
           <WeeklyStudyChart />
+          <StudyStreaks />
         </div>
       </div>
     </main>

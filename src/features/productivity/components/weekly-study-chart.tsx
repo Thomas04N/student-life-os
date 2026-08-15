@@ -173,9 +173,9 @@ export function WeeklyStudyChart() {
       <div className="mt-6 grid gap-3 sm:grid-cols-7">
         {weeklyData.days.map((day) => {
           const height = Math.max(
-            day.focusedSeconds > 0 ? 12 : 4,
+            day.focusedSeconds > 0 ? 14 : 6,
             Math.round(
-              (day.focusedSeconds / weeklyData.maxFocusedSeconds) * 128,
+              (day.focusedSeconds / weeklyData.maxFocusedSeconds) * 112,
             ),
           );
           const isToday = day.key === dateKey(startOfToday());
@@ -189,7 +189,7 @@ export function WeeklyStudyChart() {
                   : "border-slate-200 bg-slate-50"
               }`}
             >
-              <div className="flex items-end justify-between gap-3 sm:h-40 sm:flex-col sm:items-stretch">
+              <div className="grid min-h-40 grid-cols-[minmax(0,1fr)_80px] gap-3 sm:min-h-52 sm:grid-cols-1 sm:grid-rows-[auto_1fr]">
                 <div className="min-w-20 sm:min-w-0">
                   <p className="text-sm font-semibold text-slate-950">
                     {day.label}
@@ -199,7 +199,7 @@ export function WeeklyStudyChart() {
                   </p>
                 </div>
 
-                <div className="flex flex-1 items-end justify-end sm:h-32 sm:justify-center">
+                <div className="flex h-28 items-end justify-end sm:h-32 sm:justify-center">
                   <div
                     className={`w-full min-w-20 rounded-md sm:min-w-0 ${
                       day.focusedSeconds > 0 ? "bg-teal-700" : "bg-slate-300"
@@ -216,11 +216,11 @@ export function WeeklyStudyChart() {
                 </div>
               </div>
 
-              <div className="mt-3 flex items-center justify-between gap-2 text-xs">
-                <span className="font-medium text-slate-700">
+              <div className="mt-4 grid min-h-10 gap-1 text-xs">
+                <span className="font-medium text-slate-700 tabular-nums">
                   {formatStudyDuration(day.focusedSeconds)}
                 </span>
-                <span className="text-slate-500">
+                <span className="leading-4 text-slate-500">
                   {day.sessions} {day.sessions === 1 ? "session" : "sessions"}
                 </span>
               </div>
