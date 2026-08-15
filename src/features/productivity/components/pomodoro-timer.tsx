@@ -19,6 +19,14 @@ type SessionDraft = {
   studiedTopic: string;
 };
 
+type StoredTimerState = {
+  completedFocusSessions: number;
+  isRunning: boolean;
+  mode: TimerMode;
+  secondsRemaining: number;
+  timerEndsAt: number | null;
+};
+
 const timerConfig: TimerConfig = {
   focus: 25 * 60,
   shortBreak: 5 * 60,
@@ -28,6 +36,7 @@ const timerConfig: TimerConfig = {
 
 const STORAGE_KEY = "student-life-os:study-sessions:v1";
 const DAILY_GOAL_STORAGE_KEY = "student-life-os:daily-study-goal:v1";
+const TIMER_STORAGE_KEY = "student-life-os:pomodoro-timer:v1";
 const DEFAULT_DAILY_GOAL_SECONDS = 30 * 60;
 const MIN_DAILY_GOAL_SECONDS = 5 * 60;
 const MAX_DAILY_GOAL_SECONDS = 8 * 60 * 60;
@@ -143,6 +152,49 @@ function parseStoredStudySessions(storedSessions: string | null) {
   }
 }
 
+function isTimerMode(value: unknown): value is TimerMode {
+  return value === "focus" || value === "shortBreak" || value === "longBreak";
+}
+
+function parseStoredTimerState(storedTimerState: string | null) {
+  if (!storedTimerState) {
+    return null;
+  }
+
+  try {
+    const parsedTimerState = JSON.parse(storedTimerState);
+
+    if (
+      typeof parsedTimerState !== "object" ||
+      parsedTimerState === null ||
+      !isTimerMode(parsedTimerState.mode) ||
+      typeof parsedTimerState.secondsRemaining !== "number" ||
+      typeof parsedTimerState.isRunning !== "boolean" ||
+      typeof parsedTimerState.completedFocusSessions !== "number" ||
+      (parsedTimerState.timerEndsAt !== null &&
+        typeof parsedTimerState.timerEndsAt !== "number")
+    ) {
+      return null;
+    }
+
+    return {
+      completedFocusSessions: Math.max(
+        0,
+        Math.floor(parsedTimerState.completedFocusSessions),
+      ),
+      isRunning: parsedTimerState.isRunning,
+      mode: parsedTimerState.mode,
+      secondsRemaining: Math.min(
+        getModeDuration(parsedTimerState.mode),
+        Math.max(0, Math.ceil(parsedTimerState.secondsRemaining)),
+      ),
+      timerEndsAt: parsedTimerState.timerEndsAt,
+    } satisfies StoredTimerState;
+  } catch {
+    return null;
+  }
+}
+
 function createStudySession(): StudySession {
   const completedAt = new Date();
 
@@ -184,6 +236,7 @@ export function PomodoroTimer() {
     DEFAULT_DAILY_GOAL_SECONDS,
   );
   const [hasLoadedDailyGoal, setHasLoadedDailyGoal] = useState(false);
+  const [hasLoadedTimerState, setHasLoadedTimerState] = useState(false);
 
   const progress = useMemo(() => {
     const duration = getModeDuration(mode);
@@ -270,6 +323,76 @@ export function PomodoroTimer() {
   }, []);
 
   useEffect(() => {
+    if (!hasLoadedStudySessions) {
+      return;
+    }
+
+    void Promise.resolve().then(() => {
+      const storedTimerState = parseStoredTimerState(
+        window.localStorage.getItem(TIMER_STORAGE_KEY),
+      );
+
+      if (!storedTimerState) {
+        setHasLoadedTimerState(true);
+        return;
+      }
+
+      if (
+        storedTimerState.isRunning &&
+        storedTimerState.timerEndsAt !== null
+      ) {
+        const nextSecondsRemaining = Math.max(
+          0,
+          Math.ceil((storedTimerState.timerEndsAt - Date.now()) / 1000),
+        );
+
+        if (nextSecondsRemaining > 0) {
+          setMode(storedTimerState.mode);
+          setSecondsRemaining(nextSecondsRemaining);
+          setTimerEndsAt(storedTimerState.timerEndsAt);
+          setIsRunning(true);
+          setCompletedFocusSessions(storedTimerState.completedFocusSessions);
+          setHasLoadedTimerState(true);
+          return;
+        }
+
+        if (storedTimerState.mode === "focus") {
+          const nextCompletedFocusSessions =
+            storedTimerState.completedFocusSessions + 1;
+          const nextMode = getNextMode(
+            storedTimerState.mode,
+            nextCompletedFocusSessions,
+          );
+
+          setStudySessions((currentSessions) => [
+            ...currentSessions,
+            createStudySession(),
+          ]);
+          setMode(nextMode);
+          setSecondsRemaining(getModeDuration(nextMode));
+          setCompletedFocusSessions(nextCompletedFocusSessions);
+        } else {
+          setMode("focus");
+          setSecondsRemaining(timerConfig.focus);
+          setCompletedFocusSessions(storedTimerState.completedFocusSessions);
+        }
+
+        setTimerEndsAt(null);
+        setIsRunning(false);
+        setHasLoadedTimerState(true);
+        return;
+      }
+
+      setMode(storedTimerState.mode);
+      setSecondsRemaining(storedTimerState.secondsRemaining);
+      setTimerEndsAt(null);
+      setIsRunning(false);
+      setCompletedFocusSessions(storedTimerState.completedFocusSessions);
+      setHasLoadedTimerState(true);
+    });
+  }, [hasLoadedStudySessions]);
+
+  useEffect(() => {
     if (hasLoadedStudySessions) {
       window.localStorage.setItem(STORAGE_KEY, JSON.stringify(studySessions));
     }
@@ -283,6 +406,29 @@ export function PomodoroTimer() {
       );
     }
   }, [dailyGoalSeconds, hasLoadedDailyGoal]);
+
+  useEffect(() => {
+    if (!hasLoadedTimerState) {
+      return;
+    }
+
+    const timerState: StoredTimerState = {
+      completedFocusSessions,
+      isRunning,
+      mode,
+      secondsRemaining,
+      timerEndsAt,
+    };
+
+    window.localStorage.setItem(TIMER_STORAGE_KEY, JSON.stringify(timerState));
+  }, [
+    completedFocusSessions,
+    hasLoadedTimerState,
+    isRunning,
+    mode,
+    secondsRemaining,
+    timerEndsAt,
+  ]);
 
   const completeSession = useCallback(() => {
     setIsRunning(false);
