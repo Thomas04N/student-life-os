@@ -74,6 +74,17 @@ export default async function Home() {
               Open your daily task list and plan focused work.
             </p>
           </Link>
+
+          <Link
+            href="/calendar"
+            className="rounded-lg border border-slate-200 bg-white p-5 shadow-sm transition hover:border-teal-300 hover:shadow-md"
+          >
+            <p className="text-sm font-medium text-slate-500">Calendar</p>
+            <p className="mt-3 text-2xl font-semibold">Month view</p>
+            <p className="mt-2 text-sm text-slate-600">
+              Open a simple calendar outline for planning your schedule.
+            </p>
+          </Link>
         </section>
 
         <section className="rounded-lg border border-slate-200 bg-white p-6 shadow-sm">
